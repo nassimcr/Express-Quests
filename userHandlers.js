@@ -1,20 +1,28 @@
 const database = require("./database");
+const argon2 = require("argon2");
 
-const postUser = (req, res) => {
-  const { firstname, lastname, email, city, language } = req.body;
+const postUser = async (req, res) => {
+  const { firstname, lastname, email, city, language, password } = req.body;
 
-  database
-    .query(
-      "INSERT INTO users(firstname, lastname, email, city, language) VALUES (?, ?, ?, ?, ?)",
-      [firstname, lastname, email, city, language]
-    )
-    .then(([result]) => {
-      res.location(`/api/users/${result.insertId}`).sendStatus(201);
-    })
-    .catch((err) => {
-      console.error(err);
-      res.status(500).send("Error saving the movie");
-    });
+  try {
+    const hashedPassword = await argon2.hash(password);
+
+    const sql =
+      "INSERT INTO users (firstname, lastname, email, city, language, hashedPassword) VALUES (?, ?, ?, ?, ?, ?)";
+
+    await database.query(sql, [
+      firstname,
+      lastname,
+      email,
+      city,
+      language,
+      hashedPassword,
+    ]);
+    res.status(201).send("User created");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error creating user");
+  }
 };
 
 const getUsers = (req, res) => {
@@ -72,26 +80,30 @@ const getUserById = (req, res) => {
     });
 };
 
-const updateUser = (req, res) => {
-  const id = parseInt(req.params.id);
-  const { firstname, lastname, email, city, language } = req.body;
+const updateUser = async (req, res) => {
+  const { firstname, lastname, email, city, language, password } = req.body;
+  const { userId } = req.params;
 
-  database
-    .query(
-      "update user set firstname = ?, lastname = ?, email = ?, city = ?, language = ? where id = ?",
-      [firstname, lastname, email, city, language, id]
-    )
-    .then(([result]) => {
-      if (result.affectedRows === 0) {
-        res.status(404).send("Not Found");
-      } else {
-        res.sendStatus(204);
-      }
-    })
-    .catch((err) => {
-      console.error(err);
-      res.status(500).send("Error editing the movie");
-    });
+  try {
+    const hashedPassword = await argon2.hash(password);
+
+    const sql =
+      "UPDATE users SET firstname = ?, lastname = ?, email = ?, city = ?, language = ?, hashedPassword = ? WHERE id = ?";
+
+    await database.query(sql, [
+      firstname,
+      lastname,
+      email,
+      city,
+      language,
+      hashedPassword,
+      userId,
+    ]);
+    res.status(200).send("User updated");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error updating user");
+  }
 };
 
 const deleteUser = (req, res) => {
